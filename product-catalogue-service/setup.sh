@@ -62,7 +62,7 @@ prompt_input() {
     local prompt_message="$1"
     local default_value="$2"
     local user_input
-    
+
     if [ -n "$default_value" ]; then
         read -p "$(echo -e ${YELLOW}$prompt_message [${default_value}]: ${NC})" user_input
         echo "${user_input:-$default_value}"
@@ -75,7 +75,7 @@ prompt_input() {
 prompt_yes_no() {
     local prompt_message="$1"
     local response
-    
+
     while true; do
         read -p "$(echo -e ${YELLOW}$prompt_message [y/n]: ${NC})" response
         case "$response" in
@@ -97,13 +97,13 @@ install_homebrew() {
         else
             print_info "Installing Homebrew..."
             /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            
+
             # Add Homebrew to PATH for Apple Silicon Macs
             if [[ $(uname -m) == 'arm64' ]]; then
                 echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
                 eval "$(/opt/homebrew/bin/brew shellenv)"
             fi
-            
+
             print_success "Homebrew installed successfully"
         fi
     fi
@@ -115,10 +115,10 @@ install_homebrew() {
 
 check_prerequisites() {
     print_header "Step 1: Checking and Installing Prerequisites"
-    
+
     # Install Homebrew first (macOS)
     install_homebrew
-    
+
     # Check Java
     if command -v java &> /dev/null; then
         java_version=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}')
@@ -126,7 +126,7 @@ check_prerequisites() {
     else
         install_java
     fi
-    
+
     # Check Maven
     if command -v mvn &> /dev/null; then
         mvn_version=$(mvn -version | grep "Apache Maven" | awk '{print $3}')
@@ -134,7 +134,7 @@ check_prerequisites() {
     else
         install_maven
     fi
-    
+
     # Check PostgreSQL
     if command -v psql &> /dev/null; then
         pg_version=$(psql --version | awk '{print $3}')
@@ -142,7 +142,7 @@ check_prerequisites() {
     else
         install_postgresql
     fi
-    
+
     # Check Git
     if command -v git &> /dev/null; then
         git_version=$(git --version | awk '{print $3}')
@@ -150,24 +150,24 @@ check_prerequisites() {
     else
         install_git
     fi
-    
+
     print_success "All prerequisites are installed!"
 }
 
 install_java() {
     print_info "Installing Java JDK 17..."
-    
+
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS with Homebrew
         brew install openjdk@17
-        
+
         # Link Java for macOS
         sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
-        
+
         # Add to PATH
         echo 'export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"' >> ~/.zshrc
         export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
-        
+
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         # Linux with apt
         if command -v apt-get &> /dev/null; then
@@ -177,13 +177,13 @@ install_java() {
             sudo yum install -y java-17-openjdk-devel
         fi
     fi
-    
+
     print_success "Java installed successfully"
 }
 
 install_maven() {
     print_info "Installing Maven..."
-    
+
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS with Homebrew
         brew install maven
@@ -196,24 +196,24 @@ install_maven() {
             sudo yum install -y maven
         fi
     fi
-    
+
     print_success "Maven installed successfully"
 }
 
 install_postgresql() {
     print_info "Installing PostgreSQL..."
-    
+
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS with Homebrew
         brew install postgresql@15
-        
+
         # Start PostgreSQL service
         brew services start postgresql@15
-        
+
         # Add to PATH
         echo 'export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"' >> ~/.zshrc
         export PATH="/opt/homebrew/opt/postgresql@15/bin:$PATH"
-        
+
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         # Linux with apt
         if command -v apt-get &> /dev/null; then
@@ -228,14 +228,14 @@ install_postgresql() {
             sudo systemctl enable postgresql
         fi
     fi
-    
+
     print_success "PostgreSQL installed successfully"
     sleep 3  # Wait for PostgreSQL to start
 }
 
 install_git() {
     print_info "Installing Git..."
-    
+
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS with Homebrew
         brew install git
@@ -248,13 +248,13 @@ install_git() {
             sudo yum install -y git
         fi
     fi
-    
+
     print_success "Git installed successfully"
 }
 
 install_github_cli() {
     print_info "Installing GitHub CLI (gh)..."
-    
+
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS with Homebrew
         brew install gh
@@ -271,59 +271,25 @@ install_github_cli() {
             sudo yum install -y gh
         fi
     fi
-    
+
     print_success "GitHub CLI installed successfully"
     gh --version
 }
 
 ################################################################################
-# Step 2: GitHub Authentication
+# Step 2: GitHub Authentication and Repository Clone
 ################################################################################
 
-github_authentication() {
-    print_header "Step 2: GitHub Authentication"
-    
-    # Check if gh is installed
-    if command -v gh &> /dev/null; then
-        print_success "GitHub CLI (gh) already installed (skipping)"
-    else
-        print_warning "GitHub CLI (gh) is not installed"
-        install_github_cli
-    fi
-    
-    # Check if already authenticated
-    if gh auth status &> /dev/null; then
-        print_success "Already authenticated with GitHub (skipping)"
-        gh auth status 2>&1 | head -3
-    else
-        print_info "Please authenticate with GitHub..."
-        print_info "You will be prompted to login via browser or token"
-        echo ""
-        
-        gh auth login
-        
-        if gh auth status &> /dev/null; then
-            print_success "GitHub authentication successful!"
-        else
-            print_error "GitHub authentication failed"
-            print_error "Please run 'gh auth login' manually and try again"
-            exit 1
-        fi
-    fi
-}
+github_auth_and_clone() {
+    print_header "Step 2: GitHub Authentication and Repository Setup"
 
-################################################################################
-# Step 3: Clone Repository
-################################################################################
+    # First, check if repository already exists locally
+    if [ -d "$PROJECT_DIR/.git" ]; then
+        print_success "Repository already exists at: $(pwd)/$PROJECT_DIR"
 
-clone_repository() {
-    print_header "Step 3: Cloning Repository"
-    
-    if [ -d "sales-and-onboarding" ]; then
-        print_success "Repository already exists (skipping clone)"
         if prompt_yes_no "Do you want to pull latest changes?"; then
-            cd sales-and-onboarding
-            print_info "Updating to latest version..."
+            cd $PROJECT_DIR
+            print_info "Pulling latest changes..."
             if git pull origin main 2>/dev/null || git pull origin master 2>/dev/null; then
                 print_success "Repository updated successfully"
             else
@@ -331,26 +297,57 @@ clone_repository() {
             fi
             cd ..
         else
-            print_info "Skipping repository update"
+            print_info "Using existing repository"
         fi
+        return 0
+    fi
+
+    # Repository doesn't exist - need to authenticate and clone
+    print_warning "Repository not found locally. Authentication and cloning required."
+    echo ""
+
+    # Step 1: Install GitHub CLI if needed
+    if command -v gh &> /dev/null; then
+        print_success "GitHub CLI (gh) is already installed"
     else
-        print_info "Cloning repository from $REPO_URL"
-        if git clone $REPO_URL; then
-            print_success "Repository cloned successfully"
-        else
-            print_error "Failed to clone repository"
-            exit 1
-        fi
+        print_warning "GitHub CLI (gh) is not installed"
+        install_github_cli
+    fi
+
+    # Step 2: ALWAYS authenticate before cloning
+    print_info "Authenticating with GitHub..."
+    print_info "You will be prompted to login via browser or token"
+    echo ""
+
+    gh auth login
+
+    # Verify authentication
+    if gh auth status &> /dev/null; then
+        print_success "GitHub authentication successful!"
+    else
+        print_error "GitHub authentication failed"
+        print_error "Please run 'gh auth login' manually and try again"
+        exit 1
+    fi
+
+    # Step 3: Clone repository
+    print_info "Cloning repository from $REPO_URL"
+    if git clone $REPO_URL; then
+        print_success "Repository cloned successfully"
+    else
+        print_error "Failed to clone repository"
+        print_error "Please check your GitHub access and try again"
+        exit 1
     fi
 }
 
 ################################################################################
-# Step 4: Database Setup
+# Step 3: Database Setup
 ################################################################################
 
 setup_database() {
-    print_header "Step 4: Setting Up Local Database"
-    
+    print_header "Step 3: Setting Up Local Database"
+
     # Get database credentials for local setup
     print_info "Configuring local PostgreSQL database"
     DB_USER=$(prompt_input "PostgreSQL username" "$DB_USER")
@@ -362,14 +359,14 @@ setup_database() {
     DB_HOST="localhost"
     DB_PORT="5432"
     DB_NAME=$(prompt_input "Database name" "$DB_NAME")
-    
+
     # Check if PostgreSQL is running
     print_info "Checking PostgreSQL connection..."
     if PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -c '\q' 2>/dev/null; then
         print_success "PostgreSQL connection successful"
     else
         print_error "Cannot connect to PostgreSQL. Please check your credentials and ensure PostgreSQL is running"
-        
+
         # Try to start PostgreSQL
         if prompt_yes_no "Would you like to try starting PostgreSQL?"; then
             if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -383,7 +380,7 @@ setup_database() {
                 sudo systemctl start postgresql
                 sleep 3
             fi
-            
+
             if PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -c '\q' 2>/dev/null; then
                 print_success "PostgreSQL started successfully"
             else
@@ -394,7 +391,7 @@ setup_database() {
             exit 1
         fi
     fi
-    
+
     # Check if database exists
     print_info "Checking if database '$DB_NAME' exists..."
     if PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw $DB_NAME; then
@@ -403,7 +400,7 @@ setup_database() {
             print_info "Dropping database..."
             PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -c "DROP DATABASE IF EXISTS $DB_NAME;"
             print_success "Database dropped"
-            
+
             # Create database
             print_info "Creating database '$DB_NAME'..."
             if PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres -c "CREATE DATABASE $DB_NAME;"; then
@@ -427,10 +424,10 @@ setup_database() {
             exit 1
         fi
     fi
-    
+
     # Create tables
     print_info "Creating database tables..."
-    
+
     PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME <<EOF
 -- Create product table
 CREATE TABLE IF NOT EXISTS product (
@@ -498,37 +495,37 @@ CREATE TABLE IF NOT EXISTS product_term (
     FOREIGN KEY (product_id) REFERENCES product(id) ON DELETE CASCADE
 );
 EOF
-    
+
     if [ $? -eq 0 ]; then
         print_success "Database tables created successfully"
     else
         print_error "Failed to create database tables"
         exit 1
     fi
-    
+
     # Verify tables
     table_count=$(PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';")
     print_success "Created $table_count tables in database"
 }
 
 ################################################################################
-# Step 5: Configure Application
+# Step 4: Configure Application
 ################################################################################
 
 configure_application() {
-    print_header "Step 5: Configuring Application"
-    
+    print_header "Step 4: Configuring Application"
+
     cd $PROJECT_DIR
-    
+
     local config_file="src/main/resources/application.yml"
-    
+
     if [ ! -f "$config_file" ]; then
         print_error "application.yml file not found"
         exit 1
     fi
-    
+
     print_info "Updating database configuration..."
-    
+
     # Backup original file if not already backed up
     if [ ! -f "${config_file}.backup" ]; then
         cp $config_file ${config_file}.backup
@@ -536,7 +533,7 @@ configure_application() {
     else
         print_success "Backup already exists (skipping)"
     fi
-    
+
     # Update database configuration
     if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' "s|url:.*|url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}|g" $config_file
@@ -549,9 +546,9 @@ configure_application() {
         sed -i "s|password:.*|password: ${DB_PASSWORD}|g" $config_file
         sed -i "s|use-mock-data:.*|use-mock-data: false|g" $config_file
     fi
-    
+
     print_success "Application configured successfully"
-    
+
     print_info "Configuration:"
     echo "  Database URL: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}"
     echo "  Database User: ${DB_USER}"
@@ -559,21 +556,21 @@ configure_application() {
 }
 
 ################################################################################
-# Step 6: Build Project
+# Step 5: Build Project
 ################################################################################
 
 build_project() {
-    print_header "Step 6: Building Project"
-    
+    print_header "Step 5: Building Project"
+
     # Check if project was already built
     if [ -f "target/product-catalogue-service-0.0.1-SNAPSHOT.jar" ] || [ -d "target" ]; then
         print_info "Previous build found. Rebuilding..."
     else
         print_info "Running first build (this may take a few minutes)..."
     fi
-    
+
     print_info "Running Maven build..."
-    
+
     if ./mvnw clean install -DskipTests; then
         print_success "Project built successfully"
     else
@@ -590,26 +587,26 @@ build_project() {
 }
 
 ################################################################################
-# Step 7: Load Sample Data (Optional)
+# Step 6: Load Sample Data (Optional)
 ################################################################################
 
 load_sample_data() {
-    print_header "Step 7: Load Sample Data (Optional)"
-    
+    print_header "Step 6: Load Sample Data (Optional)"
+
     if prompt_yes_no "Would you like to load sample product data?"; then
         print_info "Starting application temporarily to load data..."
-        
+
         # Start application in background
         ./mvnw spring-boot:run > /tmp/product-catalogue.log 2>&1 &
         APP_PID=$!
-        
+
         print_info "Waiting for application to start (30 seconds)..."
         sleep 30
-        
+
         # Check if app is running
         if curl -s http://localhost:8082/actuator/health > /dev/null; then
             print_success "Application started"
-            
+
             # Load data
             print_info "Loading sample data..."
             if curl -X POST http://localhost:8082/v1/data-loader/products -H "Content-Type: application/json"; then
@@ -618,7 +615,7 @@ load_sample_data() {
                 print_warning "Could not load sample data automatically"
                 print_info "You can load it manually later using: curl -X POST http://localhost:8082/v1/data-loader/products"
             fi
-            
+
             # Stop application
             print_info "Stopping temporary application..."
             kill $APP_PID 2>/dev/null || true
@@ -636,12 +633,12 @@ load_sample_data() {
 }
 
 ################################################################################
-# Step 8: Run Application
+# Step 7: Run Application
 ################################################################################
 
 run_application() {
-    print_header "Step 8: Run Application"
-    
+    print_header "Step 7: Run Application"
+
     if prompt_yes_no "Would you like to start the application now?"; then
         print_success "Starting Product Catalogue API..."
         echo ""
@@ -654,7 +651,7 @@ run_application() {
         print_info "Press Ctrl+C to stop the application"
         echo ""
         sleep 3
-        
+
         ./mvnw spring-boot:run
     else
         print_info "Setup complete! You can start the application later with:"
@@ -669,7 +666,7 @@ run_application() {
 
 print_summary() {
     print_header "Setup Summary"
-    
+
     cat << EOF
 ${GREEN}✓ Setup completed successfully!${NC}
 
@@ -711,7 +708,7 @@ EOF
 
 main() {
     clear
-    
+
     cat << "EOF"
 ╔═══════════════════════════════════════════════════════════════╗
 ║                                                               ║
@@ -722,38 +719,36 @@ main() {
 ║                                                               ║
 ╚═══════════════════════════════════════════════════════════════╝
 EOF
-    
+
     echo ""
     print_warning "This script will:"
     echo "  1. Check and install prerequisites (Java, Maven, PostgreSQL, Git, GitHub CLI)"
-    echo "  2. Authenticate with GitHub"
-    echo "  3. Clone the repository"
-    echo "  4. Set up PostgreSQL database"
-    echo "  5. Configure the application"
-    echo "  6. Build the project"
-    echo "  7. (Optional) Load sample data"
-    echo "  8. (Optional) Run the application"
+    echo "  2. Authenticate with GitHub and clone repository"
+    echo "  3. Set up PostgreSQL database"
+    echo "  4. Configure the application"
+    echo "  5. Build the project"
+    echo "  6. (Optional) Load sample data"
+    echo "  7. (Optional) Run the application"
     echo ""
-    
+
     if ! prompt_yes_no "Do you want to continue?"; then
         print_info "Setup cancelled"
         exit 0
     fi
-    
+
     # Execute setup steps
     check_prerequisites
-    github_authentication
-    clone_repository
+    github_auth_and_clone
     setup_database
     configure_application
     build_project
     load_sample_data
-    
+
     # Return to original directory
     cd - > /dev/null
-    
+
     print_summary
-    
+
     echo ""
     run_application
 }

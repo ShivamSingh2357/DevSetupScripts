@@ -24,13 +24,12 @@ echo Product Catalogue API on your local machine.
 echo.
 echo This script will:
 echo   1. Check and install prerequisites (Java, Maven, PostgreSQL, Git, GitHub CLI)
-echo   2. Authenticate with GitHub
-echo   3. Clone the repository
-echo   4. Set up PostgreSQL database
-echo   5. Configure the application
-echo   6. Build the project
-echo   7. (Optional) Load sample data
-echo   8. (Optional) Run the application
+echo   2. Authenticate with GitHub and clone repository
+echo   3. Set up PostgreSQL database
+echo   4. Configure the application
+echo   5. Build the project
+echo   6. (Optional) Load sample data
+echo   7. (Optional) Run the application
 echo.
 
 set /p continue="Do you want to continue? (Y/N): "
@@ -196,17 +195,42 @@ if %errorlevel% equ 0 (
 goto :eof
 
 REM ################################################################################
-REM Step 2: GitHub Authentication
+REM Step 2: GitHub Authentication and Repository Clone
 REM ################################################################################
 
-:GITHUB_AUTH
+:GITHUB_AUTH_AND_CLONE
 echo.
 echo ========================================
-echo Step 2: GitHub Authentication
+echo Step 2: GitHub Authentication and Repository Setup
 echo ========================================
 echo.
 
-REM Check if gh is installed
+REM First, check if repository already exists locally
+if exist "%PROJECT_DIR%\.git" (
+    echo [92m[OK] Repository already exists at: %CD%\%PROJECT_DIR%[0m
+
+    set /p "UPDATE_REPO=Do you want to pull latest changes? ^(y/n^): "
+    if /i "!UPDATE_REPO!"=="y" (
+        cd %PROJECT_DIR%
+        echo [94m[INFO] Pulling latest changes...[0m
+        git pull origin main 2>nul
+        if %errorlevel% equ 0 (
+            echo [92m[OK] Repository updated successfully[0m
+        ) else (
+            echo [93m[WARNING] Could not update repository ^(might be offline or no changes^)[0m
+        )
+        cd ..
+    ) else (
+        echo [94m[INFO] Using existing repository[0m
+    )
+    goto :DATABASE_SETUP
+)
+
+REM Repository doesn't exist - need to authenticate and clone
+echo [93m[WARNING] Repository not found locally. Authentication and cloning required.[0m
+echo.
+
+REM Step 1: Install GitHub CLI if needed
 where gh >nul 2>&1
 if %errorlevel% equ 0 (
     echo [92m[OK] GitHub CLI ^(gh^) is already installed[0m
@@ -215,70 +239,45 @@ if %errorlevel% equ 0 (
     call :INSTALL_GITHUB_CLI
 )
 
-REM Check if already authenticated
+REM Step 2: ALWAYS authenticate before cloning
+echo [94m[INFO] Authenticating with GitHub...[0m
+echo [94m[INFO] You will be prompted to login via browser or token[0m
+echo.
+
+gh auth login
+
+REM Verify authentication
 gh auth status >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [92m[OK] Already authenticated with GitHub[0m
-    gh auth status
+    echo [92m[OK] GitHub authentication successful![0m
 ) else (
-    echo [94m[INFO] Please authenticate with GitHub...[0m
-    echo [94m[INFO] You will be prompted to login via browser or token[0m
-    echo.
-    
-    gh auth login
-    
-    gh auth status >nul 2>&1
-    if %errorlevel% equ 0 (
-        echo [92m[OK] GitHub authentication successful![0m
-    ) else (
-        echo [91m[ERROR] GitHub authentication failed[0m
-        echo [91m[ERROR] Please run 'gh auth login' manually and try again[0m
-        pause
-        exit /b 1
-    )
+    echo [91m[ERROR] GitHub authentication failed[0m
+    echo [91m[ERROR] Please run 'gh auth login' manually and try again[0m
+    pause
+    exit /b 1
 )
 
-REM ################################################################################
-REM Step 3: Clone Repository
-REM ################################################################################
-
-:CLONE_REPO
-echo.
-echo ========================================
-echo Step 3: Cloning Repository
-echo ========================================
-echo.
-
-if exist "sales-and-onboarding" (
-    echo [WARNING] Repository already exists
-    set /p pull="Do you want to pull latest changes? (Y/N): "
-    if /i "!pull!"=="Y" (
-        cd sales-and-onboarding
-        git pull origin main
-        cd ..
-        echo [OK] Repository updated
-    ) else (
-        echo [INFO] Skipping repository clone
-    )
+REM Step 3: Clone repository
+echo [94m[INFO] Cloning repository from %REPO_URL%[0m
+git clone %REPO_URL%
+if %errorlevel% equ 0 (
+    echo [92m[OK] Repository cloned successfully[0m
 ) else (
-    echo [INFO] Cloning repository from %REPO_URL%
-    git clone %REPO_URL%
-    if %errorlevel% equ 0 (
-        echo [OK] Repository cloned successfully
-    ) else (
-        echo [ERROR] Failed to clone repository
-        pause
-        exit /b 1
-    )
+    echo [91m[ERROR] Failed to clone repository[0m
+    echo [91m[ERROR] Please check your GitHub access and try again[0m
+    pause
+    exit /b 1
 )
 
+:DATABASE_SETUP
+
 REM ################################################################################
-REM Step 4: Database Setup
+REM Step 3: Database Setup
 REM ################################################################################
 
 echo.
 echo ========================================
-echo Step 4: Setting Up Local Database
+echo Step 3: Setting Up Local Database
 echo ========================================
 echo.
 
@@ -358,12 +357,12 @@ if %errorlevel% equ 0 (
 :configure
 
 REM ################################################################################
-REM Step 5: Configure Application
+REM Step 4: Configure Application
 REM ################################################################################
 
 echo.
 echo ========================================
-echo Step 5: Configuring Application
+echo Step 4: Configuring Application
 echo ========================================
 echo.
 
@@ -397,12 +396,12 @@ echo   Database User: %DB_USER%
 echo   Mock Data: false
 
 REM ################################################################################
-REM Step 6: Build Project
+REM Step 5: Build Project
 REM ################################################################################
 
 echo.
 echo ========================================
-echo Step 6: Building Project
+echo Step 5: Building Project
 echo ========================================
 echo.
 
@@ -424,7 +423,7 @@ if %errorlevel% equ 0 (
 )
 
 REM ################################################################################
-REM Step 7: Summary
+REM Step 6: Summary
 REM ################################################################################
 
 echo.

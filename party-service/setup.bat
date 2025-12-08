@@ -179,17 +179,45 @@ if %errorlevel% equ 0 (
 goto :eof
 
 REM ############################################################################
-REM 2. GITHUB AUTHENTICATION
+REM 2. GITHUB AUTHENTICATION AND REPOSITORY CLONE
 REM ############################################################################
 
-:GITHUB_AUTH
+:GITHUB_AUTH_AND_CLONE
 echo.
 echo ================================
-echo GitHub Authentication
+echo GitHub Authentication and Repository Setup
 echo ================================
 echo.
 
-REM Check if gh is installed
+set "REPO_URL=https://github.com/dfh-swt-banking/sales-and-onboarding.git"
+set "WORK_DIR=%USERPROFILE%\workspace"
+set "PROJECT_PATH=%WORK_DIR%\sales-and-onboarding\BackendServices\party-service"
+
+REM First, check if repository already exists locally
+if exist "%PROJECT_PATH%\.git" (
+    echo [92m[OK] Repository already exists at: %PROJECT_PATH%[0m
+    cd /d "%PROJECT_PATH%"
+
+    set /p "UPDATE_REPO=Do you want to pull latest changes? ^(y/n^): "
+    if /i "!UPDATE_REPO!"=="y" (
+        echo [94m[INFO] Pulling latest changes...[0m
+        git pull origin main 2>nul
+        if %errorlevel% equ 0 (
+            echo [92m[OK] Repository updated successfully[0m
+        ) else (
+            echo [93m[WARNING] Could not update repository ^(might be offline or no changes^)[0m
+        )
+    ) else (
+        echo [94m[INFO] Using existing repository[0m
+    )
+    goto :DATABASE_SETUP
+)
+
+REM Repository doesn't exist - need to authenticate and clone
+echo [93m[WARNING] Repository not found locally. Authentication and cloning required.[0m
+echo.
+
+REM Step 1: Install GitHub CLI if needed
 where gh >nul 2>&1
 if %errorlevel% equ 0 (
     echo [92m[OK] GitHub CLI ^(gh^) is already installed[0m
@@ -198,82 +226,60 @@ if %errorlevel% equ 0 (
     call :INSTALL_GITHUB_CLI
 )
 
-REM Check if already authenticated
+REM Step 2: ALWAYS authenticate before cloning
+echo [94m[INFO] Authenticating with GitHub...[0m
+echo [94m[INFO] You will be prompted to login via browser or token[0m
+echo.
+
+gh auth login
+
+REM Verify authentication
 gh auth status >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [92m[OK] Already authenticated with GitHub ^(skipping^)[0m
-    for /f "tokens=*" %%i in ('gh auth status 2^>^&1 ^| findstr /C:"Logged in"') do echo %%i
+    echo [92m[OK] GitHub authentication successful![0m
 ) else (
-    echo [94m[INFO] Please authenticate with GitHub...[0m
-    echo [94m[INFO] You will be prompted to login via browser or token[0m
-    echo.
-    
-    gh auth login
-    
-    gh auth status >nul 2>&1
-    if %errorlevel% equ 0 (
-        echo [92m[OK] GitHub authentication successful![0m
-    ) else (
-        echo [91m[ERROR] GitHub authentication failed[0m
-        echo [91m[ERROR] Please run 'gh auth login' manually and try again[0m
-        pause
-        exit /b 1
-    )
+    echo [91m[ERROR] GitHub authentication failed[0m
+    echo [91m[ERROR] Please run 'gh auth login' manually and try again[0m
+    pause
+    exit /b 1
 )
 
-REM ############################################################################
-REM 3. CLONE REPOSITORY
-REM ############################################################################
-
-:CLONE_REPO
-echo.
-echo ================================
-echo Cloning Repository
-echo ================================
-echo.
-
-set "REPO_URL=https://github.com/dfh-swt-banking/sales-and-onboarding.git"
-set "WORK_DIR=%USERPROFILE%\workspace"
-set "PROJECT_PATH=%WORK_DIR%\sales-and-onboarding\BackendServices\party-service"
-
-set /p "CUSTOM_DIR=Enter workspace directory (press Enter for default: %WORK_DIR%): "
+REM Step 3: Ask for workspace directory
+set /p "CUSTOM_DIR=Enter workspace directory ^(press Enter for default: %WORK_DIR%^): "
 if not "%CUSTOM_DIR%"=="" (
     set "WORK_DIR=%CUSTOM_DIR%"
     set "PROJECT_PATH=%WORK_DIR%\sales-and-onboarding\BackendServices\party-service"
 )
 
-REM Create workspace directory
+REM Step 4: Clone repository
 if not exist "%WORK_DIR%" mkdir "%WORK_DIR%"
 cd /d "%WORK_DIR%"
 
-REM Clone or update repository
-if exist "sales-and-onboarding" (
-    echo [92m[OK] Repository already exists ^(skipping clone^)[0m
-    cd sales-and-onboarding
-    echo [94m[INFO] Updating to latest version...[0m
-    git pull origin main 2>nul
-    if %errorlevel% equ 0 (
-        echo [92m[OK] Repository updated successfully[0m
-    ) else (
-        echo [93m[WARNING] Could not update repository ^(might be offline or no changes^)[0m
-    )
+echo [94m[INFO] Cloning repository from %REPO_URL%[0m
+git clone "%REPO_URL%"
+if %errorlevel% equ 0 (
+    echo [92m[OK] Repository cloned successfully[0m
 ) else (
-    echo [94m[INFO] Cloning repository from %REPO_URL%[0m
-    git clone "%REPO_URL%"
-    if %errorlevel% equ 0 (
-        echo [92m[OK] Repository cloned successfully[0m
-    ) else (
-        echo [91m[ERROR] Failed to clone repository[0m
-        pause
-        exit /b 1
-    )
+    echo [91m[ERROR] Failed to clone repository[0m
+    echo [91m[ERROR] Please check your GitHub access and try again[0m
+    pause
+    exit /b 1
 )
 
-cd /d "%PROJECT_PATH%"
-echo [92mRepository ready at: %PROJECT_PATH%[0m
+REM Verify project path
+if exist "%PROJECT_PATH%" (
+    cd /d "%PROJECT_PATH%"
+    echo [92m[OK] Repository ready at: %PROJECT_PATH%[0m
+) else (
+    echo [91m[ERROR] Project path not found: %PROJECT_PATH%[0m
+    pause
+    exit /b 1
+)
+
+:DATABASE_SETUP
 
 REM ############################################################################
-REM 4. DATABASE SETUP
+REM 3. DATABASE SETUP
 REM ############################################################################
 
 echo.
@@ -306,7 +312,7 @@ REM Try to create database
 where psql >nul 2>&1
 if %errorlevel% equ 0 (
     set "PGPASSWORD=postgres"
-    
+
     REM Check if database exists
     psql -U postgres -h localhost -lqt 2>nul | findstr /C:"%DB_NAME%" >nul 2>&1
     if %errorlevel% equ 0 (
@@ -316,7 +322,7 @@ if %errorlevel% equ 0 (
         psql -U postgres -h localhost -c "CREATE DATABASE %DB_NAME%;" 2>nul
         echo [92m[OK] Database created[0m
     )
-    
+
     REM Check if user exists
     psql -U postgres -h localhost -t -c "SELECT 1 FROM pg_roles WHERE rolname='%DB_USER%'" 2>nul | findstr "1" >nul 2>&1
     if %errorlevel% equ 0 (
@@ -326,7 +332,7 @@ if %errorlevel% equ 0 (
         psql -U postgres -h localhost -c "CREATE USER %DB_USER% WITH PASSWORD '%DB_PASSWORD%';" 2>nul
         echo [92m[OK] User created[0m
     )
-    
+
     REM Grant privileges ^(safe to run multiple times^)
     echo [94m[INFO] Granting privileges...[0m
     psql -U postgres -h localhost -c "GRANT ALL PRIVILEGES ON DATABASE %DB_NAME% TO %DB_USER%;" 2>nul
@@ -340,7 +346,7 @@ if %errorlevel% equ 0 (
 )
 
 REM ############################################################################
-REM 5. CONFIGURE APPLICATION
+REM 4. CONFIGURE APPLICATION
 REM ############################################################################
 echo.
 echo ================================
@@ -379,7 +385,7 @@ echo Database URL: %DB_URL%
 echo Server will run on port: %SERVER_PORT%
 
 REM ############################################################################
-REM 6. BUILD PROJECT
+REM 5. BUILD PROJECT
 REM ############################################################################
 
 echo.
@@ -411,7 +417,7 @@ if %errorlevel% neq 0 (
 echo [92mProject built successfully![0m
 
 REM ############################################################################
-REM 7. PRINT SUMMARY
+REM 6. PRINT SUMMARY
 REM ############################################################################
 
 echo.
@@ -438,7 +444,7 @@ echo [92mYou're all set! Happy Coding! 🚀[0m
 echo.
 
 REM ############################################################################
-REM 8. RUN APPLICATION
+REM 7. RUN APPLICATION
 REM ############################################################################
 
 set /p "START_APP=Do you want to start the application now? (y/n): "
@@ -451,7 +457,7 @@ if /i "%START_APP%"=="y" (
     echo.
     echo [93mPress Ctrl+C to stop the application[0m
     echo.
-    
+
     call mvn spring-boot:run
 ) else (
     echo.
